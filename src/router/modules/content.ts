@@ -46,7 +46,49 @@ export default [
           title: "相册管理",
           roles: ["1"]
         }
+      },
+      {
+        path: "/admin/project-management",
+        name: "ProjectManagement",
+        component: () => import("@/views/system/project-management/index.vue"),
+        meta: {
+          icon: "ep:folder-opened",
+          title: "项目管理",
+          roles: ["1"]
+        }
+      },
+      {
+        path: "/admin/tech-share-management",
+        name: "TechShareManagement",
+        component: () => import("@/views/system/tech-share-management/index.vue"),
+        meta: {
+          icon: "ep:document",
+          title: "技术分享管理",
+          roles: ["1"]
+        }
       }
     ]
+  },
+  {
+    path: "/admin/project-management/edit/:id",
+    name: "ProjectEdit",
+    component: () => import("@/views/system/project-management/edit.vue"),
+    meta: {
+      title: "编辑项目",
+      activePath: "/admin/project-management",
+      showLink: false,
+      roles: ["1"]
+    }
+  },
+  {
+    path: "/admin/tech-share-management/edit/:id",
+    name: "TechShareEdit",
+    component: () => import("@/views/system/tech-share-management/edit.vue"),
+    meta: {
+      title: "编辑技术分享",
+      activePath: "/admin/tech-share-management",
+      showLink: false,
+      roles: ["1"]
+    }
   }
 ] satisfies Array<RouteConfigsTable>;

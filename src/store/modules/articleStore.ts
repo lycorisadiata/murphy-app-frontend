@@ -24,6 +24,7 @@ import type {
   ArchiveItem
 } from "@/api/post/type";
 import defaultCover from "@/assets/img/post/default_cover.jpg";
+import { filterExcludedArticles } from "@/utils/articleFilter";
 
 export const useArticleStore = defineStore("article", () => {
   // --- 通用 State ---
@@ -102,7 +103,8 @@ export const useArticleStore = defineStore("article", () => {
     try {
       const res = await getHomeArticles();
       if (res.code === 200 && res.data) {
-        homeArticles.value = res.data;
+        // 过滤掉项目展示和技术分享分类的文章
+        homeArticles.value = filterExcludedArticles(res.data);
       } else {
         homeArticles.value = [];
       }

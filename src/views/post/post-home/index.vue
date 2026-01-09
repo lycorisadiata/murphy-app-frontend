@@ -16,6 +16,8 @@ import TagBar from "./components/TagBar/index.vue";
 import ArticleCard from "./components/ArticleCard/index.vue";
 import ArticleCardSkeleton from "./components/ArticleCardSkeleton/index.vue";
 import Archives from "./components/Archives/index.vue";
+import ProjectsList from "./components/ProjectsList/index.vue";
+import TechShareList from "./components/TechShareList/index.vue";
 import Pagination from "./components/Pagination/index.vue";
 import Sidebar from "../components/Sidebar/index.vue";
 import { getPublicArticles } from "@/api/post";
@@ -23,6 +25,7 @@ import type { Article, GetArticleListParams } from "@/api/post/type";
 import { useSiteConfigStore } from "@/store/modules/siteConfig";
 import { resetThemeToDefault } from "@/utils/themeManager";
 import { initLazyLoad, destroyLazyLoad } from "@/utils/lazyload";
+import { filterExcludedArticles, filterExcludedArticlesForArchive } from "@/utils/articleFilter";
 
 defineOptions({
   name: "PostHome"
@@ -35,13 +38,15 @@ const postConfig = computed(() => siteConfigStore.getSiteConfig?.post?.default);
 // 记录上次加载的路由路径，避免重复加载
 let lastLoadedPath = "";
 
-type PageType = "home" | "tag" | "category" | "archive";
+type PageType = "home" | "tag" | "category" | "archive" | "projects" | "techShare";
 
 const pageType = computed<PageType>(() => {
   const { path } = route;
   if (path.startsWith("/tags/")) return "tag";
   if (path.startsWith("/categories/")) return "category";
   if (path.startsWith("/archives")) return "archive";
+  if (path.startsWith("/projects")) return "projects";
+  if (path.startsWith("/techShare")) return "techShare";
   return "home";
 });
 
@@ -108,11 +113,36 @@ const fetchData = async () => {
     } else if (type === "archive") {
       if (year) params.year = Number(year);
       if (month) params.month = Number(month);
+    } else if (type === "projects") {
+      // 项目展示页面：通过分类名称筛选
+      params.category = "项目展示";
+    } else if (type === "techShare") {
+      // 技术分享页面：通过分类名称筛选
+      params.category = "技术分享";
     }
 
     const { data } = await getPublicArticles(params);
-    articles.value = data.list;
-    pagination.total = data.total;
+    
+    // 判断当前是否在查看项目展示分类
+    const isViewingProjectCategory = type === "projects" || (type === "category" && name === "项目展示");
+    
+    // 归档页面：只显示普通文章，不显示项目展示和技术分享
+    if (type === "archive") {
+      const filteredList = filterExcludedArticlesForArchive(data.list);
+      articles.value = filteredList;
+      pagination.total = data.total;
+    } 
+    // 如果不是在查看项目展示分类，过滤掉项目展示分类的文章（保留技术分享和普通文章）
+    else if (!isViewingProjectCategory) {
+      const filteredList = filterExcludedArticles(data.list);
+      articles.value = filteredList;
+      // 重新计算总数（这里简化处理，实际应该由后端返回准确的总数）
+      // 如果过滤后数量变化较大，可能需要调整分页逻辑
+      pagination.total = data.total; // 保持原总数，让分页正常工作
+    } else {
+      articles.value = data.list;
+      pagination.total = data.total;
+    }
 
     // 数据加载完成后，在下一个渲染周期初始化懒加载
     nextTick(() => {
@@ -188,7 +218,7 @@ onUnmounted(() => {
           id="recent-posts"
           class="recent-posts"
           :class="{
-            'double-column-container': isDoubleColumn,
+            'double-column-container': isDoubleColumn && pageType !== 'projects' && pageType !== 'techShare',
             '!justify-center': !isLoading && articles.length === 0
           }"
         >
@@ -197,7 +227,7 @@ onUnmounted(() => {
             <ArticleCardSkeleton
               v-for="i in 6"
               :key="'skeleton-' + i"
-              :is-double-column="isDoubleColumn"
+              :is-double-column="isDoubleColumn && pageType !== 'projects' && pageType !== 'techShare'"
             />
           </template>
 
@@ -209,7 +239,17 @@ onUnmounted(() => {
               :articles="articles"
               :total="pagination.total"
             />
-            <!-- 卡片视图 -->
+            <!-- 项目展示列表 -->
+            <ProjectsList
+              v-else-if="pageType === 'projects'"
+              :articles="articles"
+            />
+            <!-- 技术分享列表 -->
+            <TechShareList
+              v-else-if="pageType === 'techShare'"
+              :articles="articles"
+            />
+            <!-- 普通卡片视图 -->
             <template v-else>
               <ArticleCard
                 v-for="article in articles"

@@ -23,6 +23,7 @@ import {
   resetThemeToDefault
 } from "@/utils/themeManager";
 import { setArticleMetaTags, clearArticleMetaTags } from "@/utils/metaManager";
+import { filterExcludedArticles } from "@/utils/articleFilter";
 
 import PostHeader from "./components/PostHeader/index.vue";
 import PostOutdateNotice from "./components/PostOutdateNotice/index.vue";
@@ -280,7 +281,9 @@ const fetchRequiredData = async (id: string) => {
       });
 
       getPublicArticles({ page: 1, pageSize: 5 }).then(res => {
-        recentArticles.value = res.data.list.map(p => ({
+        // 过滤掉项目展示和技术分享分类的文章
+        const filteredList = filterExcludedArticles(res.data.list);
+        recentArticles.value = filteredList.map(p => ({
           id: p.id,
           title: p.title,
           cover_url: p.cover_url,
@@ -324,7 +327,9 @@ const fetchRequiredData = async (id: string) => {
 
     // 主题色将由 watch 自动处理，无需显式设置
 
-    recentArticles.value = recentArticlesResponse.data.list.map(p => ({
+    // 过滤掉项目展示和技术分享分类的文章
+    const filteredRecentList = filterExcludedArticles(recentArticlesResponse.data.list);
+    recentArticles.value = filteredRecentList.map(p => ({
       id: p.id,
       title: p.title,
       cover_url: p.cover_url,

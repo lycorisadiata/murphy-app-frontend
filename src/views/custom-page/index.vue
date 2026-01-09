@@ -106,6 +106,7 @@ import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { getCustomPage } from "@/api/custom-page";
 import { getPublicArticles } from "@/api/post";
+import { filterExcludedArticles } from "@/utils/articleFilter";
 import type { Article } from "@/api/post/type";
 import { formatDate } from "@/utils/format";
 import { useArticleStore } from "@/store/modules/articleStore";
@@ -195,7 +196,8 @@ const fetchRandomArticles = async () => {
       pageSize: 6
     });
     if (response.code === 200 && response.data?.list) {
-      randomArticles.value = response.data.list;
+      // 过滤掉项目展示和技术分享分类的文章
+      randomArticles.value = filterExcludedArticles(response.data.list);
     }
   } catch (error) {
     console.error("获取文章列表失败:", error);

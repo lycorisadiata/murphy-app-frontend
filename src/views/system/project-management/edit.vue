@@ -20,8 +20,8 @@ type ExposeParam = any;
 const MarkdownEditor = defineAsyncComponent(
   () => import("@/components/MarkdownEditor/index.vue")
 );
-import PostActionButtons from "./components/PostActionButtons.vue";
-import PublishDialog from "./components/PublishDialog.vue";
+import PostActionButtons from "../post-management/components/PostActionButtons.vue";
+import PublishDialog from "../post-management/components/PublishDialog.vue";
 
 import { useNav } from "@/layout/hooks/useNav";
 import {
@@ -37,7 +37,7 @@ import type { ArticleForm, PostCategory, PostTag } from "@/api/post/type";
 import { useSiteConfigStore } from "@/store/modules/siteConfig";
 import { constant } from "@/constant";
 
-defineOptions({ name: "PostEdit" });
+defineOptions({ name: "ProjectEdit" });
 
 const route = useRoute();
 const router = useRouter();
@@ -83,13 +83,10 @@ const initialFormState = reactive({
 const categoryOptions = ref<PostCategory[]>([]);
 const tagOptions = ref<PostTag[]>([]);
 
-// 过滤掉"项目展示"和"技术分享"分类，禁止在文章管理中选择
+// 只显示"项目展示"分类，固定分类选择
 const filteredCategoryOptions = computed(() => {
-  return categoryOptions.value.filter(
-    cat => cat.name !== "项目展示" && cat.name !== "技术分享"
-  );
+  return categoryOptions.value.filter(cat => cat.name === "项目展示");
 });
-
 const isEditMode = computed(
   () => !!articleId.value && articleId.value !== "new"
 );
@@ -105,7 +102,7 @@ const updateInitialState = () => {
   initialFormState.title = form.title;
   initialFormState.content_md = form.content_md;
 };
-const getDraftKey = () => `post_draft_${articleId.value || "new"}`;
+const getDraftKey = () => `project_draft_${articleId.value || "new"}`;
 const initPage = async () => {
   loading.value = true;
   const id = route.params.id as string;
@@ -116,6 +113,14 @@ const initPage = async () => {
     ]).then(([catRes, tagRes]) => {
       categoryOptions.value = catRes.data;
       tagOptions.value = tagRes.data;
+      
+      // 如果是新建，自动设置"项目展示"分类
+      if (id === "new") {
+        const projectCategory = catRes.data.find(cat => cat.name === "项目展示");
+        if (projectCategory) {
+          form.post_category_ids = [projectCategory.id];
+        }
+      }
     });
     if (id !== "new") {
       articleId.value = id;
@@ -124,14 +129,11 @@ const initPage = async () => {
       form.post_category_ids = data.post_categories.map(c => c.id);
       form.post_tag_ids = data.post_tags.map(t => t.id);
       
-      // 如果编辑的文章包含"项目展示"或"技术分享"分类，移除它们
-      await fetchOptionsPromise; // 确保分类列表已加载
-      const excludedCategoryIds = categoryOptions.value
-        .filter(cat => cat.name === "项目展示" || cat.name === "技术分享")
-        .map(cat => cat.id);
-      form.post_category_ids = form.post_category_ids.filter(
-        id => !excludedCategoryIds.includes(id)
-      );
+      // 如果编辑时没有"项目展示"分类，自动添加
+      const projectCategory = categoryOptions.value.find(cat => cat.name === "项目展示");
+      if (projectCategory && !form.post_category_ids.includes(projectCategory.id)) {
+        form.post_category_ids.push(projectCategory.id);
+      }
       
       if (!Array.isArray(form.summaries)) {
         form.summaries = [];
@@ -157,33 +159,27 @@ const validateName = (name: string, type: "标签"): boolean => {
   return true;
 };
 
-// 核心改动点：简化此函数，移除处理分类创建的逻辑
 const processTagsAndCategories = async () => {
-  // 确保移除"项目展示"和"技术分享"分类
-  const excludedCategoryIds = categoryOptions.value
-    .filter(cat => cat.name === "项目展示" || cat.name === "技术分享")
-    .map(cat => cat.id);
-  form.post_category_ids = form.post_category_ids.filter(
-    id => !excludedCategoryIds.includes(id)
-  );
-  
-  // 分类 ID 数组现在只包含有效的、已存在的 ID，无需处理
   if (Array.isArray(form.post_tag_ids)) {
     const tagPromises = form.post_tag_ids.map(async item => {
-      // 如果 item 已经是 tagOptions 中的一个 id，直接返回
       if (tagOptions.value.some(opt => opt.id === item)) {
         return item;
       }
-      // 否则，它是一个新创建的标签名称 (字符串)
       if (!validateName(item, "标签")) {
         throw new Error(`标签名 "${item}" 校验失败`);
       }
       const res = await createTag({ name: item });
       const newTag = res.data;
-      tagOptions.value.push(newTag); // 更新前端的 tag 列表
+      tagOptions.value.push(newTag);
       return newTag.id;
     });
     form.post_tag_ids = await Promise.all(tagPromises);
+  }
+  
+  // 确保"项目展示"分类始终存在
+  const projectCategory = categoryOptions.value.find(cat => cat.name === "项目展示");
+  if (projectCategory && !form.post_category_ids.includes(projectCategory.id)) {
+    form.post_category_ids.push(projectCategory.id);
   }
 };
 
@@ -203,22 +199,11 @@ const onSaveHandler = async (markdown: string, sanitizedHtml: string) => {
       ElMessage.success("更新成功");
     } else {
       const res = await createArticle(dataToSubmit);
-      console.log("📦 创建文章API响应:", res);
-      console.log("📦 响应数据 res.data:", res.data);
-      console.log("📦 文章ID res.data.id:", res.data?.id);
       const newArticleId = res.data?.id;
-      console.log("✅ 文章创建成功，ID:", newArticleId);
       ElMessage.success("创建成功");
       localStorage.removeItem(getDraftKey());
-      // 立即更新 articleId，避免后续操作认为还在新增模式
       articleId.value = newArticleId;
-      console.log(
-        "🔄 准备跳转到编辑页面:",
-        `/admin/post-management/edit/${newArticleId}`
-      );
-      // 使用 replace 而不是 push，确保路由真正改变
-      await router.replace({ name: "PostEdit", params: { id: newArticleId } });
-      console.log("✅ 路由跳转完成");
+      await router.replace({ name: "ProjectEdit", params: { id: newArticleId } });
     }
     localStorage.removeItem(getDraftKey());
     updateInitialState();
@@ -238,7 +223,7 @@ const handleSubmit = (isPublish = false) => {
   if (!form.title || form.title.trim() === "") {
     ElNotification({
       title: "提交错误",
-      message: "文章标题不能为空，请输入标题后再保存。",
+      message: "项目标题不能为空，请输入标题后再保存。",
       type: "error"
     });
     return;
@@ -254,7 +239,7 @@ const handleOpenPublishDialog = () => {
   if (!form.title || form.title.trim() === "") {
     ElNotification({
       title: "操作无效",
-      message: "发布前请先填写文章标题。",
+      message: "发布前请先填写项目标题。",
       type: "warning"
     });
     return;
@@ -263,7 +248,6 @@ const handleOpenPublishDialog = () => {
 };
 const handleConfirmPublish = () => {
   isPublishDialogVisible.value = false;
-  // 不再强制设置状态，使用用户在 PublishDialog 中选择的状态
   editorRef.value?.triggerSave();
 };
 
@@ -307,30 +291,25 @@ const handleGoBack = () => {
       }
     )
       .then(() => {
-        router.push({ name: "PostManagement" });
+        router.push({ name: "ProjectManagement" });
       })
       .catch(() => {});
   } else {
-    router.push({ name: "PostManagement" });
+    router.push({ name: "ProjectManagement" });
   }
 };
 
 const handleCategoryChange = (values: string[]) => {
-  // 确保移除"项目展示"和"技术分享"分类
-  const excludedCategoryIds = categoryOptions.value
-    .filter(cat => cat.name === "项目展示" || cat.name === "技术分享")
-    .map(cat => cat.id);
-  
-  const filteredValues = values.filter(id => !excludedCategoryIds.includes(id));
-  
-  if (filteredValues.length !== values.length) {
-    form.post_category_ids = filteredValues;
-    categorySelectKey.value++;
-    ElMessage.warning("文章管理禁止选择'项目展示'和'技术分享'分类");
+  // 强制固定为"项目展示"分类，不允许选择其他分类
+  const projectCategory = categoryOptions.value.find(cat => cat.name === "项目展示");
+  if (projectCategory) {
+    // 如果用户尝试选择其他分类，强制重置为项目展示分类
+    if (!values.includes(projectCategory.id) || values.length > 1) {
+      form.post_category_ids = [projectCategory.id];
+      categorySelectKey.value++;
+      ElMessage.warning("项目管理的分类已固定为'项目展示'，无法选择其他分类");
+    }
   }
-  // 这个函数现在可以保留为空，或者用于其他逻辑
-  // 主要目的是保留 @change 事件，以触发可能的 re-render
-  // 由于我们强制 key 更新，这个函数体不是必须的
 };
 
 const handleTagChange = (currentValues: string[]) => {
@@ -346,6 +325,12 @@ const refreshCategories = async () => {
     const { data } = await getCategoryList();
     categoryOptions.value = data;
     categorySelectKey.value++;
+    
+    // 刷新后确保"项目展示"分类存在
+    const projectCategory = data.find(cat => cat.name === "项目展示");
+    if (projectCategory && !form.post_category_ids.includes(projectCategory.id)) {
+      form.post_category_ids.push(projectCategory.id);
+    }
   } catch (error) {
     ElMessage.error("刷新分类列表失败");
   }
@@ -364,7 +349,6 @@ watch(
   { deep: true }
 );
 
-// 监听路由参数变化，当从新增模式切换到编辑模式时重新加载
 watch(
   () => route.params.id,
   async (newId, oldId) => {
@@ -424,7 +408,7 @@ onUnmounted(() => {
         <div class="title-container">
           <el-input
             v-model="form.title"
-            placeholder="请输入文章标题..."
+            placeholder="请输入项目标题..."
             class="title-input"
           />
         </div>
@@ -459,6 +443,7 @@ onUnmounted(() => {
       :is-submitting="isSubmitting"
       :category-select-key="categorySelectKey"
       :tag-select-key="tagSelectKey"
+      :disable-category-select="true"
       @change-category="handleCategoryChange"
       @change-tag="handleTagChange"
       @confirm-publish="handleConfirmPublish"

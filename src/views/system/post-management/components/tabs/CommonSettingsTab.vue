@@ -24,6 +24,7 @@ const props = defineProps<{
   categorySelectKey: number;
   tagSelectKey: number;
   copyrightType: "original" | "reprint";
+  disableCategorySelect?: boolean; // 是否禁用分类选择
 }>();
 
 const emit = defineEmits<{
@@ -102,6 +103,7 @@ const internalCopyrightType = computed({
               <el-icon class="label-icon"><InfoFilled /></el-icon>
             </el-tooltip>
             <el-button
+              v-if="!disableCategorySelect"
               type="primary"
               :icon="Setting"
               text
@@ -121,6 +123,7 @@ const internalCopyrightType = computed({
             style="width: 100%"
             no-data-text="暂无分类，请在'管理分类'中添加"
             :multiple-limit="hasSeriesCategory ? 1 : 3"
+            :disabled="disableCategorySelect"
             popper-class="hide-selected-check"
             @change="values => emit('change-category', values)"
           >
@@ -130,6 +133,8 @@ const internalCopyrightType = computed({
               :label="item.name"
               :value="item.id"
               :disabled="
+                item.name === '项目展示' ||
+                item.name === '技术分享' ||
                 (hasSeriesCategory && item.id !== form.post_category_ids[0]) ||
                 (hasMultipleRegularCategories && item.is_series)
               "

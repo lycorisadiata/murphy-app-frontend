@@ -250,6 +250,58 @@ export default [
         }
       },
       {
+        path: "projects",
+        name: "Projects",
+        component: () => import("@/views/post/post-home/index.vue"),
+        meta: {
+          title: () => {
+            const configs = getConfig();
+            const appName = configs?.APP_NAME;
+            return `${appName} - 项目展示`;
+          },
+          showLink: false
+        }
+      },
+      {
+        path: "projects/page/:id",
+        name: "ProjectsPaginated",
+        component: () => import("@/views/post/post-home/index.vue"),
+        meta: {
+          title: () => {
+            const configs = getConfig();
+            const appName = configs?.APP_NAME;
+            return `${appName} - 项目展示`;
+          },
+          showLink: false
+        }
+      },
+      {
+        path: "techShare",
+        name: "TechShare",
+        component: () => import("@/views/post/post-home/index.vue"),
+        meta: {
+          title: () => {
+            const configs = getConfig();
+            const appName = configs?.APP_NAME;
+            return `${appName} - 技术分享`;
+          },
+          showLink: false
+        }
+      },
+      {
+        path: "techShare/page/:id",
+        name: "TechSharePaginated",
+        component: () => import("@/views/post/post-home/index.vue"),
+        meta: {
+          title: () => {
+            const configs = getConfig();
+            const appName = configs?.APP_NAME;
+            return `${appName} - 技术分享`;
+          },
+          showLink: false
+        }
+      },
+      {
         path: "random-post",
         name: "RandomPost",
         component: () => import("@/views/post/random-post/index.vue"),

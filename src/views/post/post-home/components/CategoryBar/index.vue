@@ -19,6 +19,13 @@ const articleStore = useArticleStore();
 const { categories } = storeToRefs(articleStore);
 const { fetchCategories } = articleStore;
 
+// 过滤掉"技术分享"和"项目展示"分类，不在首页分类栏显示
+const filteredCategories = computed(() => {
+  return categories.value.filter(
+    cat => cat.name !== "技术分享" && cat.name !== "项目展示"
+  );
+});
+
 const selectedId = ref<string | null>(null);
 const catalogBarRef = ref<HTMLElement | null>(null);
 const isScrolledToEnd = ref(false);
@@ -36,7 +43,8 @@ watchEffect(async () => {
   if (categories.value.length > 0) {
     const currentCategoryName = route.params.name as string;
     if (currentCategoryName) {
-      const selectedCategory = categories.value.find(
+      // 在过滤后的分类列表中查找
+      const selectedCategory = filteredCategories.value.find(
         c => c.name === currentCategoryName
       );
       selectedId.value = selectedCategory ? selectedCategory.id : null;
@@ -99,7 +107,7 @@ onUnmounted(() => {
             <a>首页</a>
           </div>
           <div
-            v-for="category in categories"
+            v-for="category in filteredCategories"
             :key="category.id"
             class="catalog-list-item"
             :class="{ select: selectedId === category.id }"

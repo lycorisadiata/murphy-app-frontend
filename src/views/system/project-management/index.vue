@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { reactive, onMounted, toRefs, ref } from "vue";
+import { reactive, onMounted, toRefs, ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage, ElMessageBox, ElDivider, ElTooltip } from "element-plus";
-import { getArticleList, deleteArticle, batchDeleteArticles } from "@/api/post";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { getArticleList, deleteArticle, batchDeleteArticles, getCategoryList } from "@/api/post";
 import type { Article, GetArticleListParams } from "@/api/post/type";
 import {
   Search,
@@ -14,15 +14,19 @@ import {
   Download
 } from "@element-plus/icons-vue";
 import { useArticleStore } from "@/store/modules/articleStore";
-import ImportExportDialog from "./components/ImportExportDialog.vue";
+import ImportExportDialog from "../post-management/components/ImportExportDialog.vue";
+import { IconifyIconOnline } from "@/components/ReIcon";
 
 const articleStore = useArticleStore();
 
 defineOptions({
-  name: "PostManagement"
+  name: "ProjectManagement"
 });
 
 const router = useRouter();
+
+// 项目展示分类ID（用于后续可能的功能扩展）
+const projectCategoryId = ref<string | null>(null);
 
 const state = reactive({
   loading: false,
@@ -70,7 +74,6 @@ const statusOptions = [
 
 /**
  * 格式化 ISO 日期字符串为 'YYYY-MM-DD HH:mm'
- * @param isoString ISO 格式的日期字符串
  */
 const formatDate = (isoString: string) => {
   if (!isoString) return "N/A";
@@ -84,6 +87,19 @@ const formatDate = (isoString: string) => {
   return `${yyyy}-${MM}-${dd} ${hh}:${mm}`;
 };
 
+// 获取项目展示分类ID
+const fetchProjectCategoryId = async () => {
+  try {
+    const { data } = await getCategoryList();
+    const projectCategory = data.find(cat => cat.name === "项目展示");
+    if (projectCategory) {
+      projectCategoryId.value = projectCategory.id;
+    }
+  } catch (error) {
+    console.error("获取分类列表失败:", error);
+  }
+};
+
 const fetchData = async () => {
   state.loading = true;
   try {
@@ -91,24 +107,28 @@ const fetchData = async () => {
       page: state.pagination.currentPage,
       pageSize: state.pagination.pageSize,
       query: state.searchParams.query,
-      status: state.searchParams.status
+      status: state.searchParams.status,
+      category: "项目展示" // 默认筛选项目展示分类
     };
     const { data } = await getArticleList(params);
-    // 过滤掉项目展示和技术分享分类的文章
+    // 前端再次过滤，确保只显示"项目展示"分类的文章
     const filteredList = data.list.filter(article => {
       if (!article.post_categories || article.post_categories.length === 0) {
-        return true; // 没有分类的文章保留
+        return false; // 没有分类的文章不显示
       }
-      // 排除包含"项目展示"或"技术分享"分类的文章
-      return !article.post_categories.some(
-        category => category.name === "项目展示" || category.name === "技术分享"
+      // 只显示包含"项目展示"分类且不包含"技术分享"分类的文章
+      const hasProjectCategory = article.post_categories.some(
+        cat => cat.name === "项目展示"
       );
+      const hasTechShareCategory = article.post_categories.some(
+        cat => cat.name === "技术分享"
+      );
+      return hasProjectCategory && !hasTechShareCategory;
     });
     state.tableData = filteredList;
-    // 注意：总数可能需要调整，这里保持原总数以便分页正常工作
     state.pagination.total = data.total;
   } catch (error) {
-    ElMessage.error("获取文章列表失败");
+    ElMessage.error("获取项目列表失败");
   } finally {
     state.loading = false;
   }
@@ -126,15 +146,15 @@ const handleReset = () => {
 };
 
 const handleNew = () => {
-  router.push({ name: "PostEdit", params: { id: "new" } });
+  router.push({ name: "ProjectEdit", params: { id: "new" } });
 };
 
 const handleEdit = (row: Article) => {
-  router.push({ name: "PostEdit", params: { id: row.id } });
+  router.push({ name: "ProjectEdit", params: { id: row.id } });
 };
 
 const handleDelete = (row: Article) => {
-  ElMessageBox.confirm(`确定要删除文章《${row.title}》吗？`, "提示", {
+  ElMessageBox.confirm(`确定要删除项目《${row.title}》吗？`, "提示", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
     type: "warning"
@@ -208,13 +228,13 @@ const batchDeleting = ref(false);
 
 const handleBatchDelete = async () => {
   if (selectedArticles.value.length === 0) {
-    ElMessage.warning("请先选择要删除的文章");
+    ElMessage.warning("请先选择要删除的项目");
     return;
   }
 
   try {
     await ElMessageBox.confirm(
-      `确定要删除选中的 ${selectedArticles.value.length} 篇文章吗？此操作不可恢复。`,
+      `确定要删除选中的 ${selectedArticles.value.length} 个项目吗？此操作不可恢复。`,
       "批量删除确认",
       {
         confirmButtonText: "确定删除",
@@ -228,13 +248,12 @@ const handleBatchDelete = async () => {
 
     if (data.failed_count > 0) {
       ElMessage.warning(
-        `删除完成：成功 ${data.success_count} 篇，失败 ${data.failed_count} 篇`
+        `删除完成：成功 ${data.success_count} 个，失败 ${data.failed_count} 个`
       );
     } else {
-      ElMessage.success(`成功删除 ${data.success_count} 篇文章`);
+      ElMessage.success(`成功删除 ${data.success_count} 个项目`);
     }
 
-    // 清空选择并刷新列表
     selectedArticles.value = [];
     selectionMode.value = false;
     fetchData();
@@ -247,13 +266,14 @@ const handleBatchDelete = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchProjectCategoryId();
   fetchData();
 });
 </script>
 
 <template>
-  <div class="post-management-container">
+  <div class="project-management-container">
     <!-- 顶部搜索和操作栏 -->
     <div class="control-panel">
       <div class="search-area">
@@ -266,7 +286,7 @@ onMounted(() => {
           />
           <el-input
             v-model="searchParams.query"
-            placeholder="搜索文章标题、内容..."
+            placeholder="搜索项目标题、内容..."
             class="search-input"
             clearable
             @keyup.enter="handleSearch"
@@ -274,7 +294,7 @@ onMounted(() => {
         </div>
         <el-select
           v-model="searchParams.status"
-          placeholder="文章状态"
+          placeholder="项目状态"
           class="status-select"
           clearable
         >
@@ -367,14 +387,14 @@ onMounted(() => {
           :icon="Plus"
           @click="handleNew"
         >
-          新增文章
+          新增项目
         </el-button>
       </div>
     </div>
 
     <div
       v-loading="loading"
-      element-loading-text="正在加载文章列表..."
+      element-loading-text="正在加载项目列表..."
       class="content-area"
     >
       <div v-if="tableData.length > 0" class="article-list">
@@ -558,7 +578,7 @@ onMounted(() => {
 
       <el-empty
         v-if="!loading && tableData.length === 0"
-        description="暂无文章"
+        description="暂无项目"
       >
         <el-button type="primary" :icon="Plus" @click="handleNew"
           >立即新增</el-button
@@ -591,7 +611,7 @@ onMounted(() => {
 .main-content {
   margin: 0;
 }
-.post-management-container {
+.project-management-container {
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -736,14 +756,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 300px; // 防止 loading 时高度塌陷
+  min-height: 300px;
   background: var(--anzhiyu-card-bg);
   border: var(--style-border);
   border-radius: 12px;
   box-shadow: var(--anzhiyu-shadow-border);
   overflow: hidden;
 
-  // loading 遮罩样式
   :deep(.el-loading-mask) {
     background-color: var(--anzhiyu-card-bg);
     opacity: 0.9;
@@ -769,8 +788,8 @@ onMounted(() => {
   gap: 8px;
   padding: 12px;
   flex: 1;
-  height: 0; // 配合 flex: 1 让列表填充剩余空间并内部滚动
-  min-height: 300px; // 防止 loading 时高度塌陷
+  height: 0;
+  min-height: 300px;
   overflow-y: auto;
 }
 
@@ -860,7 +879,6 @@ onMounted(() => {
     background: var(--anzhiyu-secondbg);
   }
 
-  // 状态标签
   .status-badge {
     position: absolute;
     top: 8px;
@@ -923,7 +941,6 @@ onMounted(() => {
   min-width: 0;
 }
 
-// 内容头部
 .content-header {
   display: flex;
   align-items: center;
@@ -949,7 +966,6 @@ onMounted(() => {
   }
 }
 
-// 元数据
 .content-meta {
   .meta-tags {
     display: flex;
@@ -979,7 +995,6 @@ onMounted(() => {
   }
 }
 
-// 信息栏
 .content-info {
   display: flex;
   align-items: center;
@@ -1007,7 +1022,6 @@ onMounted(() => {
   display: contents;
 }
 
-// 操作按钮区
 .item-actions {
   flex-shrink: 0;
   display: flex;
@@ -1033,7 +1047,6 @@ onMounted(() => {
   }
 }
 
-// 分页
 .pagination-container {
   display: flex;
   justify-content: center;
@@ -1062,7 +1075,6 @@ onMounted(() => {
   }
 }
 
-// 空状态
 .el-empty {
   flex: 1;
   display: flex;
@@ -1071,9 +1083,8 @@ onMounted(() => {
   padding: 40px;
 }
 
-// 响应式调整
 @media (max-width: 768px) {
-  .post-management-container {
+  .project-management-container {
     padding: 10px;
   }
 

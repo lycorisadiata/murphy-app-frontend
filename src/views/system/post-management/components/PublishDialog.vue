@@ -20,6 +20,7 @@ const props = defineProps<{
   isSubmitting: boolean;
   categorySelectKey: number;
   tagSelectKey: number;
+  disableCategorySelect?: boolean;
 }>();
 
 const emit = defineEmits([
@@ -86,6 +87,12 @@ const handleConfirm = () => {
   internalForm.copyright = true;
   // 将关键词标签数组转换为逗号分隔的字符串
   internalForm.keywords = keywordTags.value.join(", ");
+  
+  // 如果当前状态是草稿，且没有设置定时发布，则设置为已发布
+  if (internalForm.status === "DRAFT" && !internalForm.scheduled_at) {
+    internalForm.status = "PUBLISHED";
+  }
+  
   emit("confirm-publish");
 };
 
@@ -113,6 +120,7 @@ const handleRefreshCategories = () => {
             :category-select-key="categorySelectKey"
             :tag-select-key="tagSelectKey"
             :copyright-type="copyrightType"
+            :disable-category-select="disableCategorySelect"
             @change-category="values => emit('change-category', values)"
             @change-tag="values => emit('change-tag', values)"
             @update:copyright-type="val => (copyrightType = val)"
