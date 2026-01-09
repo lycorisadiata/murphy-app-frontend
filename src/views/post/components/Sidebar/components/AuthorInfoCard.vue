@@ -189,25 +189,33 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-@keyframes gradient {
-  0% {
-    background-position: 0% 50%;
-  }
+/* 玻璃效果混入 */
+@mixin glass-effect($bg-light, $bg-dark, $border-light, $border-dark) {
+  background: $bg-light;
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid $border-light;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
 
-  50% {
-    background-position: 100% 50%;
-  }
-
-  100% {
-    background-position: 0% 50%;
+  html.dark & {
+    background: $bg-dark;
+    border: 1px solid $border-dark;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   }
 }
 
 .card-info {
   padding: 0;
   border: none;
-  /* 预留固定高度，防止布局偏移 */
   contain: layout;
+  border-radius: 16px;
+  overflow: hidden;
+  @include glass-effect(
+    rgba(255, 255, 255, 0.5),
+    rgba(0, 0, 0, 0.5),
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.15)
+  );
 
   &::before {
     position: absolute;
@@ -216,22 +224,12 @@ onMounted(() => {
     width: 100%;
     height: 100%;
     content: "";
-    background: linear-gradient(
-      -25deg,
-      var(--anzhiyu-main),
-      var(--anzhiyu-main-op-deep),
-      var(--anzhiyu-main),
-      var(--anzhiyu-main-op-deep)
-    );
-    background-size: 400%;
-    /* 延迟动画启动，避免初始渲染时的性能影响 */
-    animation: gradient 15s ease infinite;
-    will-change: background-position;
+    background: transparent;
   }
 
   .card-content {
     position: relative;
-    /* 固定最小高度，防止内容加载时的布局偏移 */
+    z-index: 1;
     min-height: 320px;
     height: 320px;
     padding: 1rem 1.2rem;
@@ -255,18 +253,28 @@ onMounted(() => {
   padding: 2px 8px;
   margin: auto;
   font-size: 12px;
-  color: var(--anzhiyu-white);
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   user-select: none;
-  background: var(--anzhiyu-white-op);
   border-radius: 12px;
   transition: 0.3s;
+  color: var(--anzhiyu-fontcolor);
+  backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.8);
+
+  html.dark & {
+    color: var(--anzhiyu-white);
+    background: rgba(255, 255, 255, 0.15);
+  }
 
   &:hover {
-    color: var(--anzhiyu-fontcolor);
-    background: var(--anzhiyu-card-bg);
     transform: scale(1.15);
+    background: rgba(255, 255, 255, 0.95);
+
+    html.dark & {
+      background: rgba(255, 255, 255, 0.25);
+    }
   }
 
   &:active {
@@ -355,22 +363,72 @@ onMounted(() => {
 .author-info__description {
   position: absolute;
   top: 50px;
-  left: 0;
-  width: 100%;
+  left: 0.5rem;
+  width: calc(100% - 1rem);
   padding: 1rem 1.2rem;
-  color: var(--anzhiyu-white);
   opacity: 0;
-  transition: 0.3s;
+  z-index: 10;
+  border-radius: 8px;
+  transition: opacity 0.3s;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  /* 亮色模式：强制使用深色文字确保可见 */
+  color: #1a1a1a !important;
+  @include glass-effect(
+    rgba(255, 255, 255, 0.5),
+    rgba(0, 0, 0, 0.5),
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.15)
+  );
 
-  :deep(div) {
-    margin: 0.6rem 0;
-    line-height: 1.38;
-    color: rgb(255 255 255 / 80%);
-    text-align: justify;
+  html.dark & {
+    color: #ffffff !important;
   }
 
-  :deep(b) {
-    color: #fff;
+  /* 所有子元素在亮色模式下使用深色 */
+  :deep(*) {
+    color: #1a1a1a !important;
+  }
+
+  :deep(div),
+  :deep(p) {
+    margin: 0.6rem 0;
+    line-height: 1.6;
+    text-align: justify;
+    font-size: 14px;
+    color: #1a1a1a !important;
+  }
+
+  :deep(b),
+  :deep(strong) {
+    font-weight: 600;
+    color: #000000 !important;
+  }
+
+  :deep(span) {
+    color: #1a1a1a !important;
+  }
+
+  /* 暗色模式下所有子元素使用白色 */
+  html.dark & {
+    :deep(*) {
+      color: #ffffff !important;
+    }
+
+    :deep(div),
+    :deep(p) {
+      color: #ffffff !important;
+    }
+
+    :deep(b),
+    :deep(strong) {
+      color: #ffffff !important;
+    }
+
+    :deep(span) {
+      color: #ffffff !important;
+    }
   }
 }
 
@@ -390,15 +448,28 @@ onMounted(() => {
     font-size: 20px;
     font-weight: 700;
     line-height: 1;
-    color: var(--anzhiyu-white);
     text-align: left;
+    color: var(--anzhiyu-fontcolor);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+    html.dark & {
+      color: var(--anzhiyu-white);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
   }
 
   .author-info__desc {
     font-size: 12px;
     line-height: 1;
-    color: var(--anzhiyu-white);
-    opacity: 0.6;
+    color: var(--anzhiyu-secondtext);
+    opacity: 0.8;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+    html.dark & {
+      color: var(--anzhiyu-white);
+      opacity: 0.7;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
   }
 }
 
@@ -418,22 +489,30 @@ onMounted(() => {
     height: 40px;
     padding: 8px;
     font-size: 1.4em;
-    color: var(--anzhiyu-fontcolor);
-    background: var(--anzhiyu-white-op);
     border-radius: 32px;
     cursor: pointer;
-    transition: all 0.3s ease 0s;
+    transition: all 0.3s ease;
+    color: var(--anzhiyu-fontcolor);
+    backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, 0.8);
+
+    html.dark & {
+      color: var(--anzhiyu-white);
+      background: rgba(255, 255, 255, 0.15);
+    }
 
     &:hover {
       color: var(--anzhiyu-main);
-      background: var(--anzhiyu-secondbg);
-      box-shadow: none;
       transform: scale(1.1);
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
-      i {
-        color: var(--anzhiyu-main);
+      html.dark & {
+        background: rgba(255, 255, 255, 0.25);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       }
 
+      i,
       .social-iconify {
         color: var(--anzhiyu-main);
       }
@@ -446,7 +525,7 @@ onMounted(() => {
       width: 100%;
       height: 100%;
       font-size: 1rem;
-      color: var(--anzhiyu-white);
+      color: inherit;
     }
 
     .social-icon-img {
@@ -458,7 +537,7 @@ onMounted(() => {
     .social-iconify {
       width: 20px;
       height: 20px;
-      color: var(--anzhiyu-white);
+      color: inherit;
     }
   }
 }
