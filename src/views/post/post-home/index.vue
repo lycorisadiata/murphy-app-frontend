@@ -20,6 +20,7 @@ import ProjectsList from "./components/ProjectsList/index.vue";
 import TechShareList from "./components/TechShareList/index.vue";
 import Pagination from "./components/Pagination/index.vue";
 import Sidebar from "../components/Sidebar/index.vue";
+import AnBannerCard from "@/components/AnBannerCard";
 import { getPublicArticles } from "@/api/post";
 import type { Article, GetArticleListParams } from "@/api/post/type";
 import { useSiteConfigStore } from "@/store/modules/siteConfig";
@@ -54,6 +55,9 @@ const isHomePage = computed(() => pageType.value === "home");
 const isFirstPage = computed(() => pagination.page === 1);
 const showHomeTop = computed(() => isHomePage.value && isFirstPage.value);
 const isDoubleColumn = computed(() => postConfig.value?.double_column ?? true);
+const isProjectsPage = computed(() => pageType.value === "projects");
+const isTechSharePage = computed(() => pageType.value === "techShare");
+const showSidebar = computed(() => !isProjectsPage.value && !isTechSharePage.value);
 
 const articles = ref<Article[]>([]);
 const isLoading = ref(false);
@@ -207,79 +211,143 @@ onUnmounted(() => {
       <HomeTop />
     </div>
 
-    <div id="content-inner" class="layout">
-      <main class="main-content">
-        <!-- 分类/标签导航栏 -->
-        <CategoryBar v-if="isHomePage || pageType === 'category'" />
-        <TagBar v-else-if="pageType === 'tag'" />
+    <!-- 项目展示和技术分享页面：使用 equipment 风格的布局 -->
+    <template v-if="isProjectsPage || isTechSharePage">
+      <div class="special-page-container">
+        <!-- 顶部横幅 -->
+        <AnBannerCard
+          v-if="isProjectsPage"
+          tips="项目"
+          title="项目展示"
+          description="展示我的个人项目和作品"
+          :height="300"
+        />
+        <AnBannerCard
+          v-else-if="isTechSharePage"
+          tips="技术"
+          title="技术分享"
+          description="分享技术心得和经验"
+          :height="300"
+        />
 
-        <!-- 文章列表区域 -->
-        <div
-          id="recent-posts"
-          class="recent-posts"
-          :class="{
-            'double-column-container': isDoubleColumn && pageType !== 'projects' && pageType !== 'techShare',
-            '!justify-center': !isLoading && articles.length === 0
-          }"
-        >
-          <!-- 骨架屏加载状态 -->
-          <template v-if="isLoading && articles.length === 0">
-            <ArticleCardSkeleton
-              v-for="i in 6"
-              :key="'skeleton-' + i"
-              :is-double-column="isDoubleColumn && pageType !== 'projects' && pageType !== 'techShare'"
-            />
-          </template>
-
-          <!-- 文章内容 -->
-          <template v-else-if="articles.length > 0">
-            <!-- 归档视图 -->
-            <Archives
-              v-if="pageType === 'archive'"
-              :articles="articles"
-              :total="pagination.total"
-            />
-            <!-- 项目展示列表 -->
-            <ProjectsList
-              v-else-if="pageType === 'projects'"
-              :articles="articles"
-            />
-            <!-- 技术分享列表 -->
-            <TechShareList
-              v-else-if="pageType === 'techShare'"
-              :articles="articles"
-            />
-            <!-- 普通卡片视图 -->
-            <template v-else>
-              <ArticleCard
-                v-for="article in articles"
-                :key="article.id"
-                :article="article"
-                :is-double-column="isDoubleColumn"
-                :is-newest="article.id === newestArticleId"
+        <!-- 内容区域 -->
+        <div class="special-page-content">
+          <!-- 文章列表区域 -->
+          <div
+            id="recent-posts"
+            class="recent-posts"
+            :class="{
+              '!justify-center': !isLoading && articles.length === 0
+            }"
+          >
+            <!-- 骨架屏加载状态 -->
+            <template v-if="isLoading && articles.length === 0">
+              <ArticleCardSkeleton
+                v-for="i in 6"
+                :key="'skeleton-' + i"
+                :is-double-column="false"
               />
             </template>
-          </template>
 
-          <!-- 空状态 -->
-          <el-empty
-            v-if="!isLoading && articles.length === 0"
-            description="暂无文章"
+            <!-- 文章内容 -->
+            <template v-else-if="articles.length > 0">
+              <!-- 项目展示列表 -->
+              <ProjectsList
+                v-if="isProjectsPage"
+                :articles="articles"
+              />
+              <!-- 技术分享列表 -->
+              <TechShareList
+                v-else-if="isTechSharePage"
+                :articles="articles"
+              />
+            </template>
+
+            <!-- 空状态 -->
+            <el-empty
+              v-if="!isLoading && articles.length === 0"
+              description="暂无内容"
+            />
+          </div>
+
+          <!-- 分页 -->
+          <Pagination
+            v-if="showPagination"
+            :page="pagination.page"
+            :page-size="pagination.pageSize"
+            :total="pagination.total"
+            @current-change="handlePageChange"
           />
         </div>
+      </div>
+    </template>
 
-        <!-- 分页 -->
-        <Pagination
-          v-if="showPagination"
-          :page="pagination.page"
-          :page-size="pagination.pageSize"
-          :total="pagination.total"
-          @current-change="handlePageChange"
-        />
-      </main>
+    <!-- 其他页面：使用原有布局 -->
+    <template v-else>
+      <div id="content-inner" class="layout">
+        <main class="main-content">
+          <!-- 分类/标签导航栏 -->
+          <CategoryBar v-if="isHomePage || pageType === 'category'" />
+          <TagBar v-else-if="pageType === 'tag'" />
 
-      <Sidebar />
-    </div>
+          <!-- 文章列表区域 -->
+          <div
+            id="recent-posts"
+            class="recent-posts"
+            :class="{
+              'double-column-container': isDoubleColumn,
+              '!justify-center': !isLoading && articles.length === 0
+            }"
+          >
+            <!-- 骨架屏加载状态 -->
+            <template v-if="isLoading && articles.length === 0">
+              <ArticleCardSkeleton
+                v-for="i in 6"
+                :key="'skeleton-' + i"
+                :is-double-column="isDoubleColumn"
+              />
+            </template>
+
+            <!-- 文章内容 -->
+            <template v-else-if="articles.length > 0">
+              <!-- 归档视图 -->
+              <Archives
+                v-if="pageType === 'archive'"
+                :articles="articles"
+                :total="pagination.total"
+              />
+              <!-- 普通卡片视图 -->
+              <template v-else>
+                <ArticleCard
+                  v-for="article in articles"
+                  :key="article.id"
+                  :article="article"
+                  :is-double-column="isDoubleColumn"
+                  :is-newest="article.id === newestArticleId"
+                />
+              </template>
+            </template>
+
+            <!-- 空状态 -->
+            <el-empty
+              v-if="!isLoading && articles.length === 0"
+              description="暂无文章"
+            />
+          </div>
+
+          <!-- 分页 -->
+          <Pagination
+            v-if="showPagination"
+            :page="pagination.page"
+            :page-size="pagination.pageSize"
+            :total="pagination.total"
+            @current-change="handlePageChange"
+          />
+        </main>
+
+        <Sidebar />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -325,6 +393,28 @@ onUnmounted(() => {
   }
 }
 
+// 项目展示和技术分享页面专用样式
+.special-page-container {
+  max-width: 1400px;
+  padding: 1.5rem;
+  margin: 0 auto;
+}
+
+.special-page-content {
+  margin-top: 2rem;
+}
+
+.special-page-container .recent-posts {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 400px;
+
+  @media (width <= 768px) {
+    gap: 1rem;
+  }
+}
+
 @media screen and (width > 760px) and (width <= 992px) {
   .recent-post-item {
     flex-direction: row !important;
@@ -340,6 +430,10 @@ onUnmounted(() => {
 @media (width <= 768px) {
   .post-home-top-container {
     padding: 0 1rem;
+  }
+
+  .special-page-container {
+    padding: 1rem;
   }
 }
 </style>
