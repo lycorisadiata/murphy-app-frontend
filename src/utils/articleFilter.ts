@@ -24,7 +24,7 @@ export function isExcludedArticle(article: Article): boolean {
   if (!article.post_categories || article.post_categories.length === 0) {
     return false;
   }
-  
+
   return article.post_categories.some(category =>
     EXCLUDED_CATEGORIES.includes(category.name)
   );
@@ -39,7 +39,7 @@ export function isExcludedArticleForArchive(article: Article): boolean {
   if (!article.post_categories || article.post_categories.length === 0) {
     return false;
   }
-  
+
   return article.post_categories.some(category =>
     EXCLUDED_CATEGORIES_FOR_ARCHIVE.includes(category.name)
   );
