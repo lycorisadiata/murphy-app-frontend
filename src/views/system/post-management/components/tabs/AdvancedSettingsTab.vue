@@ -5,7 +5,7 @@
 -->
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { ref, watch } from "vue";
+import { ref, computed } from "vue";
 import type { ArticleForm } from "@/api/post/type";
 import { getPrimaryColor } from "@/api/post";
 import { ElMessage } from "element-plus";
@@ -21,23 +21,14 @@ const emit = defineEmits<{
 }>();
 
 const isFetchingColor = ref(false);
-const internalKeywordTags = ref<string[]>([...props.keywordTags]);
 
-// 同步关键词标签
-watch(
-  () => props.keywordTags,
-  newTags => {
-    internalKeywordTags.value = [...newTags];
+// 使用 computed getter/setter 模式处理双向绑定，避免 watch 循环
+const internalKeywordTags = computed({
+  get: () => props.keywordTags,
+  set: (value: string[]) => {
+    emit("update:keywordTags", value);
   }
-);
-
-watch(
-  internalKeywordTags,
-  newTags => {
-    emit("update:keywordTags", newTags);
-  },
-  { deep: true }
-);
+});
 
 // 禁用未来日期
 const disabledFutureDate = (time: Date) => {
@@ -110,9 +101,11 @@ const handleFetchPrimaryColor = async () => {
         <el-form-item label="自定义永久链接 (可选)" prop="abbrlink">
           <el-input
             v-model="form.abbrlink"
-            placeholder="例如: my-awesome-post"
+            placeholder="例如: my-post 或 my-article-2024"
           />
-          <div class="form-item-help">唯一、友好，留空则自动生成。</div>
+          <div class="form-item-help">
+            自定义文章ID，支持字母、数字、中文、连字符、下划线和点。
+          </div>
         </el-form-item>
       </el-col>
 
