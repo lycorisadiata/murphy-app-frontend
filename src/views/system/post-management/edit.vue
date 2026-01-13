@@ -22,6 +22,8 @@ const MarkdownEditor = defineAsyncComponent(
 );
 import PostActionButtons from "./components/PostActionButtons.vue";
 import PublishDialog from "./components/PublishDialog.vue";
+import ArticleHistoryDrawer from "./components/ArticleHistoryDrawer.vue";
+import type { ArticleHistory } from "@/api/article-history/types";
 
 import { useNav } from "@/layout/hooks/useNav";
 import {
@@ -52,6 +54,7 @@ const loading = ref(true);
 const isSubmitting = ref(false);
 const articleId = ref<string | null>(null);
 const isPublishDialogVisible = ref(false);
+const isHistoryDrawerVisible = ref(false);
 
 const form = reactive<ArticleForm>({
   title: "",
@@ -192,6 +195,15 @@ const onSaveHandler = async (markdown: string, sanitizedHtml: string) => {
   isSubmitting.value = true;
   try {
     await processTagsAndCategories();
+    if (!form.title || form.title.trim() === "") {
+      ElNotification({
+        title: "提交错误",
+        message: "文章标题不能为空，请输入标题后再保存。",
+        type: "error"
+      });
+      isSubmitting.value = false;
+      return;
+    }
     const dataToSubmit = {
       ...form,
       content_md: markdown,
@@ -265,6 +277,32 @@ const handleConfirmPublish = () => {
   isPublishDialogVisible.value = false;
   // 不再强制设置状态，使用用户在 PublishDialog 中选择的状态
   editorRef.value?.triggerSave();
+};
+
+// 显示历史版本抽屉
+const handleShowHistory = () => {
+  if (!articleId.value) {
+    ElMessage.warning("请先保存文章后再查看历史版本");
+    return;
+  }
+  isHistoryDrawerVisible.value = true;
+};
+
+// 从历史版本恢复
+const handleRestoreFromHistory = (history: ArticleHistory) => {
+  // 使用历史版本的内容替换当前编辑器内容
+  form.title = history.title;
+  form.content_md = history.content_md;
+  form.cover_url = history.cover_url;
+  form.top_img_url = history.top_img_url;
+  form.primary_color = history.primary_color;
+  form.summaries = history.summaries || [];
+  form.keywords = history.keywords;
+
+  // 更新初始状态，避免恢复后被认为是脏数据
+  updateInitialState();
+
+  ElMessage.success(`已恢复到版本 v${history.version} 的内容`);
 };
 
 const handleImageUploadForMdV3 = async (
@@ -438,6 +476,7 @@ onUnmounted(() => {
           :post-slug="form.abbrlink"
           @save="handleSubmit(false)"
           @publish="handleOpenPublishDialog"
+          @show-history="handleShowHistory"
         />
       </div>
     </header>
@@ -463,6 +502,13 @@ onUnmounted(() => {
       @change-tag="handleTagChange"
       @confirm-publish="handleConfirmPublish"
       @refresh-categories="refreshCategories"
+    />
+
+    <!-- 历史版本抽屉 -->
+    <ArticleHistoryDrawer
+      v-model:visible="isHistoryDrawerVisible"
+      :article-id="articleId || ''"
+      @restore="handleRestoreFromHistory"
     />
   </div>
 </template>
