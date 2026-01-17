@@ -286,6 +286,11 @@ watch(pageContent, () => {
   executeScripts();
 });
 
+// 监听路由路径变化，重新加载页面
+watch(currentPath, () => {
+  loadPage();
+});
+
 onMounted(() => {
   loadPage();
 });
